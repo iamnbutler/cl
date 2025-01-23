@@ -43,12 +43,6 @@ class ColorItem extends vscode.TreeItem {
     super(label);
     this.tooltip = `${label}: ${color}`;
     this.description = color;
-
-    // Add color preview
-    this.iconPath = new vscode.ThemeIcon(
-      "circle-filled",
-      new vscode.ThemeColor(color),
-    );
   }
 }
 
