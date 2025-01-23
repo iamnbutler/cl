@@ -16,47 +16,47 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-      "commands": [
+    "commands": [
+      {
+        "command": "color-library.saveColor",
+        "title": "Color Library: Save Color"
+      },
+      {
+        "command": "color-library.insertColor",
+        "title": "Color Library: Insert Color"
+      },
+      {
+        "command": "color-library.refreshColors",
+        "title": "Color Library: Refresh Colors",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
         {
-          "command": "color-library.saveColor",
-          "title": "Color Library: Save Color"
-        },
+          "id": "color-library",
+          "title": "Color Library",
+          "icon": "$(symbol-color)"
+        }
+      ]
+    },
+    "views": {
+      "color-library": [
         {
-          "command": "color-library.insertColor",
-          "title": "Color Library: Insert Color"
-        },
+          "id": "colorLibraryView",
+          "name": "Saved Colors"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
         {
           "command": "color-library.refreshColors",
-          "title": "Color Library: Refresh Colors",
-          "icon": "$(refresh)"
+          "when": "view == colorLibraryView",
+          "group": "navigation"
         }
-      ],
-      "viewsContainers": {
-        "activitybar": [
-          {
-            "id": "color-library",
-            "title": "Color Library",
-            "icon": "$(symbol-color)"
-          }
-        ]
-      },
-      "views": {
-        "color-library": [
-          {
-            "id": "colorLibraryView",
-            "name": "Saved Colors"
-          }
-        ]
-      },
-      "menus": {
-        "view/title": [
-          {
-            "command": "color-library.refreshColors",
-            "when": "view == colorLibraryView",
-            "group": "navigation"
-          }
-        ]
-      }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
