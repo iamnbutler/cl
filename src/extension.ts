@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as path from "path";
 
 const explicitlySupportedLanguages = ["rust", "typescript"] as const;
 
@@ -92,6 +91,31 @@ function languageIsSupported(language: string): language is SupportedLanguage {
   return explicitlySupportedLanguages.includes(language as SupportedLanguage);
 }
 
+const hexColorRegex = /#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/;
+const rgbColorRegex = /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/;
+const rgbaColorRegex =
+  /rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01]?\.?\d*)\s*\)/;
+
+function tryParseColor(color: string): string | null {
+  if (hexColorRegex.test(color)) {
+    return color;
+  }
+
+  const rgbMatch = color.match(rgbColorRegex);
+  if (rgbMatch) {
+    const [_, r, g, b] = rgbMatch;
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  const rgbaMatch = color.match(rgbaColorRegex);
+  if (rgbaMatch) {
+    const [_, r, g, b, a] = rgbaMatch;
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+
+  return null;
+}
+
 function colorStringForLanguage(
   color: ColorItem,
   language: SupportedLanguage,
@@ -121,7 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
       saveColor(context, colorTreeDataProvider),
     ),
     vscode.commands.registerCommand("color-library.insertColor", () =>
-      insertColor(context),
+      insertChosenColor(context),
     ),
     vscode.commands.registerCommand("color-library.refreshColors", () =>
       colorTreeDataProvider.refresh(),
@@ -141,12 +165,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-// Regular expressions for color matching
-const hexColorRegex = /#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/;
-const rgbColorRegex = /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/;
-const rgbaColorRegex =
-  /rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01]?\.?\d*)\s*\)/;
-
 async function saveColor(
   context: vscode.ExtensionContext,
   treeDataProvider: ColorTreeDataProvider,
@@ -158,17 +176,13 @@ async function saveColor(
   }
 
   const line = editor.document.lineAt(editor.selection.active.line);
-  const colorMatch =
-    line.text.match(hexColorRegex) ||
-    line.text.match(rgbColorRegex) ||
-    line.text.match(rgbaColorRegex);
+  const parsedColor = tryParseColor(line.text);
 
-  if (!colorMatch) {
+  if (!parsedColor) {
     vscode.window.showInformationMessage("No color found in the current line");
     return;
   }
 
-  const color = colorMatch[0];
   const colorName = await vscode.window.showInputBox({
     prompt: "Enter a name for this color",
     placeHolder: "e.g., Primary Blue",
@@ -183,16 +197,18 @@ async function saveColor(
     "colorLibrary",
     {},
   );
-  colorLibrary[colorName] = color;
+  colorLibrary[colorName] = parsedColor;
   await context.globalState.update("colorLibrary", colorLibrary);
 
   treeDataProvider.refresh();
-  vscode.window.showInformationMessage(`Color "${colorName}" saved: ${color}`);
+  vscode.window.showInformationMessage(
+    `Color "${colorName}" saved: ${parsedColor}`,
+  );
 }
 
-async function insertColor(context: vscode.ExtensionContext) {
-  const activeLanguage = activeBufferLanguage();
-
+async function chooseColor(
+  context: vscode.ExtensionContext,
+): Promise<ColorItem | null> {
   const colorLibrary = context.globalState.get<{ [key: string]: string }>(
     "colorLibrary",
     {},
@@ -201,7 +217,7 @@ async function insertColor(context: vscode.ExtensionContext) {
 
   if (colorNames.length === 0) {
     vscode.window.showInformationMessage("No colors saved in the library");
-    return;
+    return null;
   }
 
   const selectedColorName = await vscode.window.showQuickPick(colorNames, {
@@ -209,13 +225,14 @@ async function insertColor(context: vscode.ExtensionContext) {
   });
 
   if (!selectedColorName) {
-    return;
+    return null;
   }
 
-  const color = new ColorItem(
-    selectedColorName,
-    colorLibrary[selectedColorName],
-  );
+  return new ColorItem(selectedColorName, colorLibrary[selectedColorName]);
+}
+
+async function insertColor(color: ColorItem) {
+  const activeLanguage = activeBufferLanguage();
   const editor = vscode.window.activeTextEditor;
 
   if (editor && activeLanguage && languageIsSupported(activeLanguage)) {
@@ -227,6 +244,13 @@ async function insertColor(context: vscode.ExtensionContext) {
     editor.edit((editBuilder) => {
       editBuilder.insert(editor.selection.active, color.color);
     });
+  }
+}
+
+async function insertChosenColor(context: vscode.ExtensionContext) {
+  const color = await chooseColor(context);
+  if (color) {
+    await insertColor(color);
   }
 }
 
