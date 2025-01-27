@@ -117,6 +117,9 @@ export function activate(context: vscode.ExtensionContext) {
         treeDataProvider.refresh();
       },
     ),
+    vscode.commands.registerCommand("color-library.clearAllColors", () =>
+      clearAllColors(context, treeDataProvider),
+    ),
   );
 }
 
@@ -174,4 +177,20 @@ async function chooseColor(context: vscode.ExtensionContext) {
   const chosen = await vscode.window.showQuickPick(names);
   if (!chosen) return null;
   return { label: chosen, color: library[chosen] };
+}
+
+async function clearAllColors(
+  context: vscode.ExtensionContext,
+  tree: ColorTreeDataProvider,
+) {
+  const result = await vscode.window.showWarningMessage(
+    "Are you sure you want to clear all colors?",
+    "Yes",
+    "No",
+  );
+  if (result === "Yes") {
+    await context.globalState.update("colorLibrary", {});
+    tree.refresh();
+    vscode.window.showInformationMessage("All colors have been cleared.");
+  }
 }

@@ -1,99 +1,116 @@
 {
-    "name": "color-library",
-    "displayName": "color-library",
-    "description": "Save, manage and insert colors",
-    "version": "0.0.1",
-    "engines": {
-        "vscode": "^1.96.0"
-    },
-    "categories": [
-        "Other"
+  "name": "color-library",
+  "displayName": "color-library",
+  "description": "Save, manage and insert colors",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:colorLibraryView",
+    "onCommand:color-library.saveColor",
+    "onCommand:color-library.insertColor",
+    "onCommand:color-library.clearAllColors"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "color-library.saveColor",
+        "title": "Color Library: Save Color"
+      },
+      {
+        "command": "color-library.insertColor",
+        "title": "Color Library: Insert Color"
+      },
+      {
+        "command": "color-library.refreshColors",
+        "title": "Color Library: Refresh Colors",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "color-library.deleteColor",
+        "title": "Color Library: Delete Color",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "color-library.clearAllColors",
+        "title": "Color Library: Clear All Colors",
+        "icon": "$(clear-all)"
+      }
     ],
-    "activationEvents": [
-        "onView:colorLibraryView",
-        "onCommand:color-library.saveColor",
-        "onCommand:color-library.insertColor"
-    ],
-    "main": "./out/extension.js",
-    "contributes": {
-        "commands": [
-            {
-                "command": "color-library.saveColor",
-                "title": "Color Library: Save Color"
-            },
-            {
-                "command": "color-library.insertColor",
-                "title": "Color Library: Insert Color"
-            },
-            {
-                "command": "color-library.refreshColors",
-                "title": "Color Library: Refresh Colors",
-                "icon": "$(refresh)"
-            },
-            {
-                "command": "color-library.deleteColor",
-                "title": "Color Library: Delete Color",
-                "icon": "$(trash)"
-            }
-        ],
-        "viewsContainers": {
-            "activitybar": [
-                {
-                    "id": "color-library",
-                    "title": "Color Library",
-                    "icon": "$(symbol-color)"
-                }
-            ]
-        },
-        "views": {
-            "color-library": [
-                {
-                    "id": "colorLibraryView",
-                    "name": "Saved Colors"
-                }
-            ]
-        },
-        "menus": {
-            "view/title": [
-                {
-                    "command": "color-library.refreshColors",
-                    "when": "view == colorLibraryView",
-                    "group": "navigation"
-                }
-            ],
-            "view/item/context": [
-                {
-                    "command": "color-library.deleteColor",
-                    "when": "view == colorLibraryView",
-                    "group": "inline"
-                }
-            ]
-        },
-        "keybindings": [
-            {
-                "command": "color-library.deleteColor",
-                "key": "Delete",
-                "when": "viewItem == colorLibraryView"
-            }
-        ]
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "color-library",
+          "title": "Color Library",
+          "icon": "$(symbol-color)"
+        }
+      ]
     },
-    "scripts": {
-        "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile && npm run lint",
-        "lint": "eslint src",
-        "test": "vscode-test"
+    "views": {
+      "color-library": [
+        {
+          "id": "colorLibraryView",
+          "name": "Saved Colors"
+        }
+      ]
     },
-    "devDependencies": {
-        "@types/vscode": "^1.96.0",
-        "@types/mocha": "^10.0.9",
-        "@types/node": "20.x",
-        "@typescript-eslint/eslint-plugin": "^8.10.0",
-        "@typescript-eslint/parser": "^8.7.0",
-        "eslint": "^9.13.0",
-        "typescript": "^5.6.3",
-        "@vscode/test-cli": "^0.0.10",
-        "@vscode/test-electron": "^2.4.1"
-    }
+    "menus": {
+      "view/title": [
+        {
+          "command": "color-library.refreshColors",
+          "when": "view == colorLibraryView",
+          "group": "navigation"
+        },
+        {
+          "command": "color-library.clearAllColors",
+          "when": "view == colorLibraryView",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "color-library.deleteColor",
+          "when": "view == colorLibraryView",
+          "group": "inline"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "color-library.deleteColor",
+        "key": "Delete",
+        "when": "viewItem == colorLibraryView"
+      },
+      {
+        "command": "color-library.clearAllColors",
+        "key": "ctrl+shift+delete",
+        "mac": "cmd+shift+delete",
+        "when": "viewItem == colorLibraryView"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "@types/mocha": "^10.0.9",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.10.0",
+    "@typescript-eslint/parser": "^8.7.0",
+    "eslint": "^9.13.0",
+    "typescript": "^5.6.3",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1"
+  }
 }
