@@ -10,12 +10,6 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onView:colorLibraryView",
-    "onCommand:color-library.saveColor",
-    "onCommand:color-library.insertColor",
-    "onCommand:color-library.clearAllColors"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
