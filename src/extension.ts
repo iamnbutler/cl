@@ -1,6 +1,10 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
+const explicitlySupportedLanguages = ["rust", "typescript"] as const;
+
+type SupportedLanguage = (typeof explicitlySupportedLanguages)[number];
+
 class ColorTreeDataProvider implements vscode.TreeDataProvider<ColorItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<
     ColorItem | undefined | null | void
@@ -46,6 +50,64 @@ class ColorItem extends vscode.TreeItem {
   }
 }
 
+/**
+ * Returns an array of supported languages the project contains, if any.
+ */
+async function projectLanguages(): Promise<SupportedLanguage[]> {
+  const languages: ("rust" | "typescript")[] = [];
+
+  const rustFiles = await vscode.workspace.findFiles(
+    "Cargo.toml",
+    "**/node_modules/**",
+    1,
+  );
+  if (rustFiles.length > 0) {
+    languages.push("rust");
+  }
+
+  const tsconfigFiles = await vscode.workspace.findFiles(
+    "tsconfig.json",
+    "**/node_modules/**",
+    1,
+  );
+  if (tsconfigFiles.length > 0) {
+    languages.push("typescript");
+  }
+
+  return languages;
+}
+
+/**
+ * Returns the language of the active buffer, if any.
+ */
+function activeBufferLanguage(): string | null {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    return null;
+  }
+  return editor.document.languageId;
+}
+
+function languageIsSupported(language: string): language is SupportedLanguage {
+  return explicitlySupportedLanguages.includes(language as SupportedLanguage);
+}
+
+function colorStringForLanguage(
+  color: ColorItem,
+  language: SupportedLanguage,
+): string {
+  let colorValue = color.color;
+
+  switch (language) {
+    case "rust":
+      return `Rgb::new(${colorValue})`;
+    case "typescript":
+      return colorValue;
+    default:
+      return colorValue;
+  }
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log("Color Library extension is now active");
 
@@ -63,6 +125,18 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand("color-library.refreshColors", () =>
       colorTreeDataProvider.refresh(),
+    ),
+    vscode.commands.registerCommand(
+      "color-library.deleteColor",
+      (item: ColorItem) => {
+        const colorLibrary = context.globalState.get<{
+          [key: string]: string;
+        }>("colorLibrary", {});
+        delete colorLibrary[item.label];
+        context.globalState.update("colorLibrary", colorLibrary);
+        vscode.window.showInformationMessage(`Color "${item.label}" deleted`);
+        colorTreeDataProvider.refresh();
+      },
     ),
   );
 }
@@ -117,6 +191,8 @@ async function saveColor(
 }
 
 async function insertColor(context: vscode.ExtensionContext) {
+  const activeLanguage = activeBufferLanguage();
+
   const colorLibrary = context.globalState.get<{ [key: string]: string }>(
     "colorLibrary",
     {},
@@ -136,12 +212,20 @@ async function insertColor(context: vscode.ExtensionContext) {
     return;
   }
 
-  const color = colorLibrary[selectedColorName];
+  const color = new ColorItem(
+    selectedColorName,
+    colorLibrary[selectedColorName],
+  );
   const editor = vscode.window.activeTextEditor;
 
-  if (editor) {
+  if (editor && activeLanguage && languageIsSupported(activeLanguage)) {
+    const formattedColor = colorStringForLanguage(color, activeLanguage);
     editor.edit((editBuilder) => {
-      editBuilder.insert(editor.selection.active, color);
+      editBuilder.insert(editor.selection.active, formattedColor);
+    });
+  } else if (editor) {
+    editor.edit((editBuilder) => {
+      editBuilder.insert(editor.selection.active, color.color);
     });
   }
 }
