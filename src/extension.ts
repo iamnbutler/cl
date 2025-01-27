@@ -59,8 +59,9 @@ class ColorItem extends vscode.TreeItem {
     public readonly color: string,
   ) {
     super(label);
-    this.tooltip = `${label}: ${color}`;
+    this.contextValue = "colorItem";
     this.description = color;
+    this.tooltip = `${label}: ${color}`;
   }
 }
 
@@ -71,11 +72,17 @@ const rgbaColorRegex =
 
 function tryParseColor(line: string) {
   const hex = line.match(hexColorRegex);
-  if (hex) return hex[0];
+  if (hex) {
+    return hex[0];
+  }
   const rgb = line.match(rgbColorRegex);
-  if (rgb) return rgb[0];
+  if (rgb) {
+    return rgb[0];
+  }
   const rgba = line.match(rgbaColorRegex);
-  if (rgba) return rgba[0];
+  if (rgba) {
+    return rgba[0];
+  }
   return null;
 }
 
@@ -227,12 +234,18 @@ async function saveColor(
   tree: ColorTreeDataProvider,
 ) {
   const editor = vscode.window.activeTextEditor;
-  if (!editor) return;
+  if (!editor) {
+    return;
+  }
   const line = editor.document.lineAt(editor.selection.active.line);
   const parsed = tryParseColor(line.text);
-  if (!parsed) return;
+  if (!parsed) {
+    return;
+  }
   const name = await vscode.window.showInputBox({ prompt: "Enter color name" });
-  if (!name) return;
+  if (!name) {
+    return;
+  }
   const library = context.globalState.get<{ [key: string]: string }>(
     "colorLibrary",
     {},
@@ -250,12 +263,16 @@ async function insertChosenColor(
   if (!item) {
     // If no item is provided, fall back to the original behavior
     let chosenItem = await chooseColor(context);
-    if (!chosenItem) return;
+    if (!chosenItem) {
+      return;
+    }
     item = chosenItem;
   }
 
   const editor = vscode.window.activeTextEditor;
-  if (!editor) return;
+  if (!editor) {
+    return;
+  }
   const lang = activeBufferLanguage();
   if (lang && languageIsSupported(lang)) {
     editor.edit((b) =>
@@ -280,7 +297,9 @@ async function chooseColor(context: vscode.ExtensionContext) {
     return null;
   }
   const chosen = await vscode.window.showQuickPick(names);
-  if (!chosen) return null;
+  if (!chosen) {
+    return null;
+  }
   return { label: chosen, color: library[chosen] };
 }
 

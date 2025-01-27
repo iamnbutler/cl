@@ -82,12 +82,12 @@
       "view/item/context": [
         {
           "command": "color-library.deleteColor",
-          "when": "view == colorLibraryView",
+          "when": "viewItem == colorItem",
           "group": "inline"
         },
         {
           "command": "color-library.insertColor",
-          "when": "view == colorLibraryView",
+          "when": "viewItem == colorItem",
           "group": "inline",
           "icon": "$(add)"
         }
