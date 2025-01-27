@@ -20,11 +20,13 @@
     "commands": [
       {
         "command": "color-library.saveColor",
-        "title": "Color Library: Save Color"
+        "title": "Color Library: Save Color",
+        "icon": "$(save)"
       },
       {
         "command": "color-library.insertColor",
-        "title": "Color Library: Insert Color"
+        "title": "Color Library: Insert Color",
+        "icon": "$(add)"
       },
       {
         "command": "color-library.refreshColors",
@@ -62,11 +64,6 @@
     "menus": {
       "view/title": [
         {
-          "command": "color-library.refreshColors",
-          "when": "view == colorLibraryView",
-          "group": "navigation"
-        },
-        {
           "command": "color-library.clearAllColors",
           "when": "view == colorLibraryView",
           "group": "navigation"
@@ -77,13 +74,24 @@
           "command": "color-library.deleteColor",
           "when": "view == colorLibraryView",
           "group": "inline"
+        },
+        {
+          "command": "color-library.insertColor",
+          "when": "view == colorLibraryView",
+          "group": "inline",
+          "icon": "$(add)"
         }
       ]
     },
     "keybindings": [
       {
         "command": "color-library.deleteColor",
-        "key": "Delete",
+        "key": "delete",
+        "when": "viewItem == colorLibraryView"
+      },
+      {
+        "command": "color-library.insertColor",
+        "key": "enter",
         "when": "viewItem == colorLibraryView"
       },
       {
@@ -91,6 +99,12 @@
         "key": "ctrl+shift+delete",
         "mac": "cmd+shift+delete",
         "when": "viewItem == colorLibraryView"
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "colorLibraryView",
+        "contents": "Save colors from your projects.\nDouble-click on a color to insert it into your document."
       }
     ]
   },

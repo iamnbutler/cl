@@ -25,6 +25,21 @@ class ColorTreeDataProvider implements vscode.TreeDataProvider<ColorItem> {
   getTreeItem(element: ColorItem) {
     return element;
   }
+  tryGetTreeItem(input: string): ColorItem | null {
+    const colorItem = tryGetColorItem(input, this.context);
+    if (colorItem) {
+      return colorItem;
+    }
+    const library = this.context.globalState.get<{ [key: string]: string }>(
+      "colorLibrary",
+      {},
+    );
+    const color = library[input];
+    if (color) {
+      return new ColorItem(input, color);
+    }
+    return null;
+  }
   getChildren() {
     const library = this.context.globalState.get<{ [key: string]: string }>(
       "colorLibrary",
@@ -64,6 +79,14 @@ function tryParseColor(line: string) {
   return null;
 }
 
+function tryGetColorItem(
+  input: string,
+  context: vscode.ExtensionContext,
+): ColorItem | null {
+  const treeDataProvider = new ColorTreeDataProvider(context);
+  return treeDataProvider.tryGetTreeItem(input);
+}
+
 function activeBufferLanguage() {
   const editor = vscode.window.activeTextEditor;
   return editor?.document.languageId || null;
@@ -98,8 +121,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("color-library.saveColor", () =>
       saveColor(context, treeDataProvider),
     ),
-    vscode.commands.registerCommand("color-library.insertColor", () =>
-      insertChosenColor(context),
+    vscode.commands.registerCommand(
+      "color-library.insertColor",
+      (item?: ColorItem) => insertChosenColor(context, item),
     ),
     vscode.commands.registerCommand("color-library.refreshColors", () =>
       treeDataProvider.refresh(),
@@ -146,9 +170,17 @@ async function saveColor(
   vscode.window.showInformationMessage(`Saved: ${name} => ${parsed}`);
 }
 
-async function insertChosenColor(context: vscode.ExtensionContext) {
-  const item = await chooseColor(context);
-  if (!item) return;
+async function insertChosenColor(
+  context: vscode.ExtensionContext,
+  item?: ColorItem,
+) {
+  if (!item) {
+    // If no item is provided, fall back to the original behavior
+    let chosenItem = await chooseColor(context);
+    if (!chosenItem) return;
+    item = chosenItem;
+  }
+
   const editor = vscode.window.activeTextEditor;
   if (!editor) return;
   const lang = activeBufferLanguage();
