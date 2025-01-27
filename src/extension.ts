@@ -1,16 +1,157 @@
 import * as vscode from "vscode";
+import chroma from "chroma-js";
 
-const explicitlySupportedLanguages = ["rust", "typescript"] as const;
+const explicitlySupportedLanguages = ["rust", "typescript", "css"] as const;
 type SupportedLanguage = (typeof explicitlySupportedLanguages)[number];
 
+// Add a default set of colors
 const defaultColors: { [key: string]: string } = {
   Red: "#FF0000",
   Green: "#00FF00",
   Blue: "#0000FF",
+  Cyan: "#00FFFF",
+  Magenta: "#FF00FF",
+  Yellow: "#FFFF00",
+  Black: "#000000",
+  White: "#FFFFFF",
 };
+
+const hexColorRegex = /#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/;
+const rgbColorRegex = /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/;
+const rgbaColorRegex =
+  /rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01]?\.?\d*)\s*\)/;
 
 function getInitialColorLibrary(): { [key: string]: string } {
   return { ...defaultColors };
+}
+
+function createColorIcon(color: string): vscode.Uri {
+  const svg = `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+    <rect width="14" height="14" x="1" y="1" fill="${color}" stroke="white" stroke-width="1" stroke-opacity="0.1" rx="2" ry="2" />
+</svg>`;
+  const base64 = Buffer.from(svg).toString("base64");
+  return vscode.Uri.parse(`data:image/svg+xml;base64,${base64}`);
+}
+
+function tryParseColor(line: string) {
+  const hexMatch = line.match(hexColorRegex);
+  const rgbMatch = line.match(rgbColorRegex);
+  const rgbaMatch = line.match(rgbaColorRegex);
+
+  let matchedColor: string | null = null;
+
+  if (hexMatch) {
+    matchedColor = hexMatch[0];
+  } else if (rgbMatch) {
+    matchedColor = `rgb(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]})`;
+  } else if (rgbaMatch) {
+    matchedColor = `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${rgbaMatch[4]})`;
+  }
+
+  if (matchedColor) {
+    try {
+      const color = chroma(matchedColor);
+      return color.hex();
+    } catch (error) {
+      return "Color is invalid, or an unsupported color type";
+    }
+  }
+
+  try {
+    const color = chroma(line.trim());
+    return color.hex();
+  } catch (error) {
+    return "Color is invalid, or an unsupported color type";
+  }
+}
+
+function tryGetColorItem(
+  input: string,
+  context: vscode.ExtensionContext,
+): ColorItem | null {
+  const treeDataProvider = new ColorTreeDataProvider(context);
+  return treeDataProvider.tryGetTreeItem(input);
+}
+
+/**
+ * Get the active buffer's language
+ * so we can dynamically generate color strings based on the language
+ */
+function activeBufferLanguage() {
+  const editor = vscode.window.activeTextEditor;
+  return editor?.document.languageId || null;
+}
+
+function languageIsSupported(lang: string): lang is SupportedLanguage {
+  return explicitlySupportedLanguages.includes(lang as SupportedLanguage);
+}
+
+function colorStringForLanguage(color: string, lang: SupportedLanguage) {
+  switch (lang) {
+    case "rust":
+      return `Rgb::new(${color})`;
+    case "typescript":
+      return color;
+    case "css":
+      return `#${color}`;
+  }
+}
+
+function allColorsStringForLanguage(
+  colors: { [key: string]: string },
+  lang: SupportedLanguage | "default",
+): string {
+  const entries = Object.entries(colors);
+  switch (lang) {
+    case "rust":
+      return `
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Color {
+  ${entries.map(([name, _]) => `    ${name},`).join("\n")}
+}
+
+impl Color {
+  fn rgb(&self) -> Rgb {
+      match self {
+          ${entries.map(([name, color]) => `            Color::${name} => Rgb::new(${color}),`).join("\n")}
+      }
+  }
+
+  fn name(&self) -> &'static str {
+      match self {
+          ${entries.map(([name, _]) => `            Color::${name} => "${name}",`).join("\n")}
+      }
+  }
+}`;
+    case "typescript":
+      return `
+      const colorValues = {
+      ${entries.map(([name, color]) => `  "${name}": "${color}"`).join(",\n")}
+      } as const;
+
+      type Color = keyof typeof colorValues;`;
+    case "css":
+      return `
+        :root {
+          ${entries.map(([name, color]) => `  --${name}: ${color};`).join("\n")}
+        }
+        `;
+    default:
+      return entries.map(([name, color]) => color).join("\n");
+  }
+}
+
+class ColorItem extends vscode.TreeItem {
+  constructor(
+    public readonly label: string,
+    public readonly color: string,
+  ) {
+    super(label);
+    this.contextValue = "colorItem";
+    this.description = color;
+    this.iconPath = createColorIcon(color);
+    this.tooltip = `${label}: ${color}`;
+  }
 }
 
 class ColorTreeDataProvider implements vscode.TreeDataProvider<ColorItem> {
@@ -53,112 +194,10 @@ class ColorTreeDataProvider implements vscode.TreeDataProvider<ColorItem> {
   }
 }
 
-function createColorIcon(color: string): vscode.Uri {
-  const svg = `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
-    <rect width="14" height="14" x="1" y="1" fill="${color}" stroke="white" stroke-width="1" stroke-opacity="0.1" rx="2" ry="2" />
-</svg>`;
-  const base64 = Buffer.from(svg).toString("base64");
-  return vscode.Uri.parse(`data:image/svg+xml;base64,${base64}`);
-}
-
-class ColorItem extends vscode.TreeItem {
-  constructor(
-    public readonly label: string,
-    public readonly color: string,
-  ) {
-    super(label);
-    this.contextValue = "colorItem";
-    this.description = color;
-    this.iconPath = createColorIcon(color);
-    this.tooltip = `${label}: ${color}`;
-  }
-}
-
-const hexColorRegex = /#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/;
-const rgbColorRegex = /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/;
-const rgbaColorRegex =
-  /rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01]?\.?\d*)\s*\)/;
-
-function tryParseColor(line: string) {
-  const hex = line.match(hexColorRegex);
-  if (hex) {
-    return hex[0];
-  }
-  const rgb = line.match(rgbColorRegex);
-  if (rgb) {
-    return rgb[0];
-  }
-  const rgba = line.match(rgbaColorRegex);
-  if (rgba) {
-    return rgba[0];
-  }
-  return null;
-}
-
-function tryGetColorItem(
-  input: string,
-  context: vscode.ExtensionContext,
-): ColorItem | null {
-  const treeDataProvider = new ColorTreeDataProvider(context);
-  return treeDataProvider.tryGetTreeItem(input);
-}
-
-function activeBufferLanguage() {
-  const editor = vscode.window.activeTextEditor;
-  return editor?.document.languageId || null;
-}
-
-function languageIsSupported(lang: string): lang is SupportedLanguage {
-  return explicitlySupportedLanguages.includes(lang as SupportedLanguage);
-}
-
-function colorStringForLanguage(color: string, lang: SupportedLanguage) {
-  switch (lang) {
-    case "rust":
-      return `Rgb::new(${color})`;
-    case "typescript":
-      return color;
-  }
-}
-
-function allColorsStringForLanguage(
-  colors: { [key: string]: string },
-  lang: SupportedLanguage,
-): string {
-  const entries = Object.entries(colors);
-  switch (lang) {
-    case "rust":
-      return `
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum Color {
-  ${entries.map(([name, _]) => `    ${name},`).join("\n")}
-}
-
-impl Color {
-  fn rgb(&self) -> Rgb {
-      match self {
-          ${entries.map(([name, color]) => `            Color::${name} => Rgb::new(${color}),`).join("\n")}
-      }
-  }
-
-  fn name(&self) -> &'static str {
-      match self {
-          ${entries.map(([name, _]) => `            Color::${name} => "${name}",`).join("\n")}
-      }
-  }
-}`;
-    case "typescript":
-      return `
-      const colorValues = {
-      ${entries.map(([name, color]) => `  "${name}": "${color}"`).join(",\n")}
-      } as const;
-
-      type Color = keyof typeof colorValues;`;
-    default:
-      return entries.map(([name, color]) => color).join("\n");
-  }
-}
-
+/**
+ * Insert all colors from the library into the active editor
+ * in a format specific to the current buffer's language when possible
+ */
 async function insertAllColors(context: vscode.ExtensionContext) {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
@@ -181,7 +220,7 @@ async function insertAllColors(context: vscode.ExtensionContext) {
   if (lang && languageIsSupported(lang)) {
     colorString = allColorsStringForLanguage(library, lang);
   } else {
-    colorString = allColorsStringForLanguage(library, "typescript"); // Default to TypeScript format
+    colorString = allColorsStringForLanguage(library, "default");
   }
 
   editor.edit((editBuilder) => {
@@ -241,6 +280,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {}
 
+/// Parse the current line for a color and save it to the library
 async function saveColor(
   context: vscode.ExtensionContext,
   tree: ColorTreeDataProvider,
@@ -268,6 +308,7 @@ async function saveColor(
   vscode.window.showInformationMessage(`Saved: ${name} => ${parsed}`);
 }
 
+/// Insert the chosen color into the active editor in a format suitable for the current language
 async function insertChosenColor(
   context: vscode.ExtensionContext,
   item?: ColorItem,
@@ -298,6 +339,7 @@ async function insertChosenColor(
   }
 }
 
+/// Choose a color from the library
 async function chooseColor(context: vscode.ExtensionContext) {
   const library = context.globalState.get<{ [key: string]: string }>(
     "colorLibrary",
@@ -320,14 +362,16 @@ async function clearAllColors(
   tree: ColorTreeDataProvider,
 ) {
   const result = await vscode.window.showWarningMessage(
-    "Are you sure you want to clear all colors?",
+    "Are you sure you want to clear all colors and restore defaults?",
     "Yes",
     "No",
   );
   if (result === "Yes") {
-    await context.globalState.update("colorLibrary", {});
+    await context.globalState.update("colorLibrary", getInitialColorLibrary());
     tree.refresh();
-    vscode.window.showInformationMessage("All colors have been cleared.");
+    vscode.window.showInformationMessage(
+      "All colors have been reset to defaults.",
+    );
   }
 }
 
