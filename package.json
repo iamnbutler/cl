@@ -3,6 +3,7 @@
   "displayName": "color-library",
   "description": "Save, manage and insert colors",
   "version": "0.0.1",
+  "title": "Color Library",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -47,6 +48,11 @@
         "command": "color-library.clearAllColors",
         "title": "Color Library: Clear All Colors",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "color-library.exportJson",
+        "when": "viewItem == exportItem",
+        "group": "inline"
       }
     ],
     "viewsContainers": {

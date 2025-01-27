@@ -214,6 +214,9 @@ export function activate(context: vscode.ExtensionContext) {
       "color-library.insertColor",
       (item?: ColorItem) => insertChosenColor(context, item),
     ),
+    vscode.commands.registerCommand("color-library.exportJson", () =>
+      exportColorsToJson(context),
+    ),
     vscode.commands.registerCommand("color-library.refreshColors", () =>
       treeDataProvider.refresh(),
     ),
@@ -325,5 +328,34 @@ async function clearAllColors(
     await context.globalState.update("colorLibrary", {});
     tree.refresh();
     vscode.window.showInformationMessage("All colors have been cleared.");
+  }
+}
+
+async function exportColorsToJson(context: vscode.ExtensionContext) {
+  const library = context.globalState.get<{ [key: string]: string }>(
+    "colorLibrary",
+    {},
+  );
+  const jsonString = JSON.stringify(library, null, 2);
+
+  const saveLocation = await vscode.window.showSaveDialog({
+    filters: { JSON: ["json"] },
+    defaultUri: vscode.Uri.file("color_library_export.json"),
+  });
+
+  if (saveLocation) {
+    try {
+      await vscode.workspace.fs.writeFile(
+        saveLocation,
+        Buffer.from(jsonString, "utf8"),
+      );
+      vscode.window.showInformationMessage(
+        "Color library exported successfully!",
+      );
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        "Failed to export color library: " + error,
+      );
+    }
   }
 }
