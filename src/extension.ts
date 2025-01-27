@@ -105,6 +105,76 @@ function colorStringForLanguage(color: string, lang: SupportedLanguage) {
   }
 }
 
+function allColorsStringForLanguage(
+  colors: { [key: string]: string },
+  lang: SupportedLanguage,
+): string {
+  const entries = Object.entries(colors);
+  switch (lang) {
+    case "rust":
+      return `
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Color {
+  ${entries.map(([name, _]) => `    ${name},`).join("\n")}
+}
+
+impl Color {
+  fn rgb(&self) -> Rgb {
+      match self {
+          ${entries.map(([name, color]) => `            Color::${name} => Rgb::new(${color}),`).join("\n")}
+      }
+  }
+
+  fn name(&self) -> &'static str {
+      match self {
+          ${entries.map(([name, _]) => `            Color::${name} => "${name}",`).join("\n")}
+      }
+  }
+}`;
+    case "typescript":
+      return `
+      const colorValues = {
+      ${entries.map(([name, color]) => `  "${name}": "${color}"`).join(",\n")}
+      } as const;
+
+      type Color = keyof typeof colorValues;`;
+    default:
+      return entries.map(([name, color]) => color).join("\n");
+  }
+}
+
+async function insertAllColors(context: vscode.ExtensionContext) {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    vscode.window.showInformationMessage("No active editor");
+    return;
+  }
+
+  const library = context.globalState.get<{ [key: string]: string }>(
+    "colorLibrary",
+    {},
+  );
+  if (Object.keys(library).length === 0) {
+    vscode.window.showInformationMessage("Color library is empty");
+    return;
+  }
+
+  const lang = activeBufferLanguage();
+  let colorString: string;
+
+  if (lang && languageIsSupported(lang)) {
+    colorString = allColorsStringForLanguage(library, lang);
+  } else {
+    colorString = allColorsStringForLanguage(library, "typescript"); // Default to TypeScript format
+  }
+
+  editor.edit((editBuilder) => {
+    editBuilder.insert(editor.selection.active, colorString);
+  });
+
+  vscode.window.showInformationMessage("All colors inserted");
+}
+
 export function activate(context: vscode.ExtensionContext) {
   const colorLibrary = context.globalState.get<{ [key: string]: string }>(
     "colorLibrary",
@@ -120,6 +190,9 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("color-library.saveColor", () =>
       saveColor(context, treeDataProvider),
+    ),
+    vscode.commands.registerCommand("color-library.insertAll", () =>
+      insertAllColors(context),
     ),
     vscode.commands.registerCommand(
       "color-library.insertColor",
