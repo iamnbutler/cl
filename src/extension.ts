@@ -53,6 +53,14 @@ class ColorTreeDataProvider implements vscode.TreeDataProvider<ColorItem> {
   }
 }
 
+function createColorIcon(color: string): vscode.Uri {
+  const svg = `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+    <rect width="14" height="14" x="1" y="1" fill="${color}" stroke="white" stroke-width="1" stroke-opacity="0.1" rx="2" ry="2" />
+</svg>`;
+  const base64 = Buffer.from(svg).toString("base64");
+  return vscode.Uri.parse(`data:image/svg+xml;base64,${base64}`);
+}
+
 class ColorItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
@@ -61,6 +69,7 @@ class ColorItem extends vscode.TreeItem {
     super(label);
     this.contextValue = "colorItem";
     this.description = color;
+    this.iconPath = createColorIcon(color);
     this.tooltip = `${label}: ${color}`;
   }
 }
