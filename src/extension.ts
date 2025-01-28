@@ -1,7 +1,12 @@
 import * as vscode from "vscode";
 import chroma from "chroma-js";
 
-const explicitlySupportedLanguages = ["rust", "typescript", "css"] as const;
+const explicitlySupportedLanguages = [
+  "rust",
+  "typescript",
+  "css",
+  "json",
+] as const;
 type SupportedLanguage = (typeof explicitlySupportedLanguages)[number];
 
 // Add a default set of colors
@@ -21,8 +26,12 @@ const rgbColorRegex = /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/;
 const rgbaColorRegex =
   /rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([01]?\.?\d*)\s*\)/;
 
-function getInitialColorLibrary(): { [key: string]: string } {
-  return { ...defaultColors };
+function getInitialColorLibrary(): {
+  [folder: string]: { [key: string]: string };
+} {
+  return {
+    Default: { ...defaultColors },
+  };
 }
 
 function createColorIcon(color: string): vscode.Uri {
@@ -65,14 +74,6 @@ function tryParseColor(line: string) {
   }
 }
 
-function tryGetColorItem(
-  input: string,
-  context: vscode.ExtensionContext,
-): ColorItem | null {
-  const treeDataProvider = new ColorTreeDataProvider(context);
-  return treeDataProvider.tryGetTreeItem(input);
-}
-
 /**
  * Get the active buffer's language
  * so we can dynamically generate color strings based on the language
@@ -86,7 +87,7 @@ function languageIsSupported(lang: string): lang is SupportedLanguage {
   return explicitlySupportedLanguages.includes(lang as SupportedLanguage);
 }
 
-function colorStringForLanguage(color: string, lang: SupportedLanguage) {
+function colorStringForLanguage(color: string, lang?: SupportedLanguage) {
   switch (lang) {
     case "rust":
       return `Rgb::new(${color})`;
@@ -94,50 +95,152 @@ function colorStringForLanguage(color: string, lang: SupportedLanguage) {
       return color;
     case "css":
       return `#${color}`;
+    case "json":
+      return `"${color}"`;
+    default:
+      return color;
   }
 }
 
 function allColorsStringForLanguage(
-  colors: { [key: string]: string },
+  colors: { [folder: string]: { [key: string]: string } },
   lang: SupportedLanguage | "default",
 ): string {
-  const entries = Object.entries(colors);
   switch (lang) {
     case "rust":
-      return `
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum Color {
-  ${entries.map(([name, _]) => `    ${name},`).join("\n")}
+      let rustCode = `
+use palette::rgb::Rgb;
+
+trait Color {
+    fn name(&self) -> &'static str;
+    fn rgb(&self) -> Rgb;
+    fn hex(&self) -> &'static str;
 }
 
-impl Color {
-  fn rgb(&self) -> Rgb {
-      match self {
-          ${entries.map(([name, color]) => `            Color::${name} => Rgb::new(${color}),`).join("\n")}
-      }
-  }
+`;
 
-  fn name(&self) -> &'static str {
-      match self {
-          ${entries.map(([name, _]) => `            Color::${name} => "${name}",`).join("\n")}
-      }
-  }
-}`;
-    case "typescript":
-      return `
-      const colorValues = {
-      ${entries.map(([name, color]) => `  "${name}": "${color}"`).join(",\n")}
-      } as const;
+      for (const [folder, folderColors] of Object.entries(colors)) {
+        const entries = Object.entries(folderColors);
+        rustCode += `
+#[derive(Debug, Clone, Copy)]
+pub enum ${folder}Colors {
+    ${entries.map(([name, _]) => name).join(",\n    ")}
+}
 
-      type Color = keyof typeof colorValues;`;
-    case "css":
-      return `
-        :root {
-          ${entries.map(([name, color]) => `  --${name}: ${color};`).join("\n")}
+impl Color for ${folder}Colors {
+fn rgb(&self) -> Rgb {
+    match self {
+        ${entries
+          .map(([name, color]) => {
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+            return `Self::${name} => Rgb::new(${r}.0, ${g}.0, ${b}.0),`;
+          })
+          .join("\n            ")}
+    }
+}
+
+    fn name(&self) -> &'static str {
+        match self {
+            ${entries.map(([name, _]) => `Self::${name} => "${name}",`).join("\n            ")}
         }
-        `;
+    }
+
+    fn hex(&self) -> &'static str {
+        match self {
+            ${entries.map(([name, color]) => `Self::${name} => "${color}",`).join("\n            ")}
+        }
+    }
+}`;
+      }
+
+      return rustCode;
+
+    case "typescript":
+      let tsCode = `
+  interface Color {
+    name: string;
+    hex: string;
+    rgb: [number, number, number];
+  }
+
+  `;
+      for (const [folder, folderColors] of Object.entries(colors)) {
+        const entries = Object.entries(folderColors);
+        tsCode += `
+  export const ${folder}Colors = {
+  ${entries
+    .map(([name, color]) => {
+      const rgb = chroma(color).rgb();
+      return `  ${name}: { name: "${name}", hex: "${color}", rgb: [${rgb[0]}, ${rgb[1]}, ${rgb[2]}] }`;
+    })
+    .join(",\n")}
+  } as const;
+
+  export type ${folder}Color = keyof typeof ${folder}Colors;
+
+  `;
+      }
+      return tsCode;
+
+    case "css":
+      let cssCode = `:root {\n`;
+      for (const [folder, folderColors] of Object.entries(colors)) {
+        const entries = Object.entries(folderColors);
+        cssCode += `  /* ${folder} Colors */\n`;
+        cssCode += entries
+          .map(([name, color]) => {
+            const rgb = chroma(color).rgb();
+            return `  --${folder}-${name}: ${color};\n  --${folder}-${name}-rgb: ${rgb[0]}, ${rgb[1]}, ${rgb[2]};`;
+          })
+          .join("\n");
+        cssCode += "\n\n";
+      }
+      cssCode += `}
+
+  /* Color Usage Examples */
+  `;
+      for (const [folder, folderColors] of Object.entries(colors)) {
+        const entries = Object.entries(folderColors);
+        cssCode += `/* ${folder} Colors */\n`;
+        cssCode += entries
+          .map(
+            ([name, _]) =>
+              `.${folder}-${name} { color: var(--${folder}-${name}); }`,
+          )
+          .join("\n");
+        cssCode += "\n\n";
+      }
+      return cssCode.trim();
+
+    case "json":
+      let jsonCode = "{\n";
+      for (const [folder, folderColors] of Object.entries(colors)) {
+        const entries = Object.entries(folderColors);
+        jsonCode += `  "${folder}": {\n`;
+        jsonCode += entries
+          .map(([name, color]) => `    "${name}": "${color}"`)
+          .join(",\n");
+        jsonCode += "\n  },\n";
+      }
+      jsonCode += "}";
+      return jsonCode;
+
     default:
-      return entries.map(([name, color]) => color).join("\n");
+      let defaultCode = "";
+      for (const [folder, folderColors] of Object.entries(colors)) {
+        const entries = Object.entries(folderColors);
+        defaultCode += `${folder} Colors:\n`;
+        defaultCode += entries
+          .map(([name, color]) => {
+            const rgb = chroma(color).rgb();
+            return `  ${name}:\n    Hex: ${color}\n    RGB: ${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
+          })
+          .join("\n");
+        defaultCode += "\n\n";
+      }
+      return defaultCode.trim();
   }
 }
 
@@ -145,8 +248,9 @@ class ColorItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly color: string,
+    public readonly folder: string = "Default",
   ) {
-    super(label);
+    super(label, vscode.TreeItemCollapsibleState.None);
     this.contextValue = "colorItem";
     this.description = color;
     this.iconPath = createColorIcon(color);
@@ -154,43 +258,57 @@ class ColorItem extends vscode.TreeItem {
   }
 }
 
-class ColorTreeDataProvider implements vscode.TreeDataProvider<ColorItem> {
+class ColorTreeDataProvider
+  implements vscode.TreeDataProvider<ColorItem | FolderItem>
+{
   private _onDidChangeTreeData = new vscode.EventEmitter<
-    ColorItem | undefined | null | void
+    ColorItem | FolderItem | undefined | null | void
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
   constructor(private context: vscode.ExtensionContext) {}
   refresh() {
     this._onDidChangeTreeData.fire();
   }
-  getTreeItem(element: ColorItem) {
+  getTreeItem(element: ColorItem | FolderItem): vscode.TreeItem {
     return element;
   }
   tryGetTreeItem(input: string): ColorItem | null {
-    const colorItem = tryGetColorItem(input, this.context);
-    if (colorItem) {
-      return colorItem;
-    }
-    const library = this.context.globalState.get<{ [key: string]: string }>(
-      "colorLibrary",
-      {},
-    );
-    const color = library[input];
-    if (color) {
-      return new ColorItem(input, color);
+    const library = this.context.globalState.get<{
+      [folder: string]: { [key: string]: string };
+    }>("colorLibrary", {});
+    for (const [folder, colors] of Object.entries(library)) {
+      const color = colors[input];
+      if (color) {
+        return new ColorItem(input, color, folder);
+      }
     }
     return null;
   }
-  getChildren() {
-    const library = this.context.globalState.get<{ [key: string]: string }>(
-      "colorLibrary",
-      {},
-    );
-    return Promise.resolve(
-      Object.entries(library).map(
-        ([label, color]) => new ColorItem(label, color),
-      ),
-    );
+  getChildren(element?: FolderItem): Thenable<(ColorItem | FolderItem)[]> {
+    const library = this.context.globalState.get<{
+      [folder: string]: { [key: string]: string };
+    }>("colorLibrary", {});
+    if (!element) {
+      // Root level, return folders
+      return Promise.resolve(
+        Object.keys(library).map((folder) => new FolderItem(folder)),
+      );
+    } else {
+      // Inside a folder, return colors
+      const folderColors = library[element.label] || {};
+      return Promise.resolve(
+        Object.entries(folderColors).map(
+          ([label, color]) => new ColorItem(label, color, element.label),
+        ),
+      );
+    }
+  }
+}
+
+class FolderItem extends vscode.TreeItem {
+  constructor(public readonly label: string) {
+    super(label, vscode.TreeItemCollapsibleState.Expanded);
+    this.contextValue = "folder";
   }
 }
 
@@ -205,10 +323,9 @@ async function insertAllColors(context: vscode.ExtensionContext) {
     return;
   }
 
-  const library = context.globalState.get<{ [key: string]: string }>(
-    "colorLibrary",
-    {},
-  );
+  const library = context.globalState.get<{
+    [folder: string]: { [key: string]: string };
+  }>("colorLibrary", {});
   if (Object.keys(library).length === 0) {
     vscode.window.showInformationMessage("Color library is empty");
     return;
@@ -262,16 +379,23 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "color-library.deleteColor",
       (item: ColorItem) => {
-        const library = context.globalState.get<{ [key: string]: string }>(
-          "colorLibrary",
-          {},
-        );
-        delete library[item.label];
-        context.globalState.update("colorLibrary", library);
-        vscode.window.showInformationMessage(`Deleted "${item.label}"`);
-        treeDataProvider.refresh();
+        const library = context.globalState.get<{
+          [folder: string]: { [key: string]: string };
+        }>("colorLibrary", {});
+        if (library[item.folder]) {
+          delete library[item.folder][item.label];
+          if (Object.keys(library[item.folder]).length === 0) {
+            delete library[item.folder];
+          }
+          context.globalState.update("colorLibrary", library);
+          vscode.window.showInformationMessage(
+            `Deleted "${item.label}" from "${item.folder}"`,
+          );
+          treeDataProvider.refresh();
+        }
       },
     ),
+
     vscode.commands.registerCommand("color-library.clearAllColors", () =>
       clearAllColors(context, treeDataProvider),
     ),
@@ -298,14 +422,22 @@ async function saveColor(
   if (!name) {
     return;
   }
-  const library = context.globalState.get<{ [key: string]: string }>(
-    "colorLibrary",
-    {},
-  );
-  library[name] = parsed;
+  const folder =
+    (await vscode.window.showInputBox({
+      prompt: "Enter folder name (or leave empty for Default)",
+    })) || "Default";
+  const library = context.globalState.get<{
+    [folder: string]: { [key: string]: string };
+  }>("colorLibrary", {});
+  if (!library[folder]) {
+    library[folder] = {};
+  }
+  library[folder][name] = parsed;
   await context.globalState.update("colorLibrary", library);
   tree.refresh();
-  vscode.window.showInformationMessage(`Saved: ${name} => ${parsed}`);
+  vscode.window.showInformationMessage(
+    `Saved: ${name} => ${parsed} in folder ${folder}`,
+  );
 }
 
 /// Insert the chosen color into the active editor in a format suitable for the current language
@@ -341,20 +473,31 @@ async function insertChosenColor(
 
 /// Choose a color from the library
 async function chooseColor(context: vscode.ExtensionContext) {
-  const library = context.globalState.get<{ [key: string]: string }>(
-    "colorLibrary",
-    {},
-  );
-  const names = Object.keys(library);
-  if (!names.length) {
+  const library = context.globalState.get<{
+    [folder: string]: { [key: string]: string };
+  }>("colorLibrary", {});
+  const colorItems: ColorItem[] = [];
+
+  for (const folder in library) {
+    for (const color in library[folder]) {
+      colorItems.push(new ColorItem(color, library[folder][color], folder));
+    }
+  }
+
+  if (!colorItems.length) {
     vscode.window.showInformationMessage("No colors saved.");
     return null;
   }
-  const chosen = await vscode.window.showQuickPick(names);
-  if (!chosen) {
-    return null;
-  }
-  return { label: chosen, color: library[chosen] };
+
+  const chosen = await vscode.window.showQuickPick(
+    colorItems.map((item) => ({
+      label: item.label,
+      description: `${item.color} (${item.folder})`,
+      item: item,
+    })),
+  );
+
+  return chosen ? chosen.item : null;
 }
 
 async function clearAllColors(
@@ -376,10 +519,9 @@ async function clearAllColors(
 }
 
 async function exportColorsToJson(context: vscode.ExtensionContext) {
-  const library = context.globalState.get<{ [key: string]: string }>(
-    "colorLibrary",
-    {},
-  );
+  const library = context.globalState.get<{
+    [folder: string]: { [key: string]: string };
+  }>("colorLibrary", {});
   const jsonString = JSON.stringify(library, null, 2);
 
   const saveLocation = await vscode.window.showSaveDialog({
