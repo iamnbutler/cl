@@ -10,7 +10,7 @@ const explicitlySupportedLanguages = [
 type SupportedLanguage = (typeof explicitlySupportedLanguages)[number];
 
 // Add a default set of colors
-const defaultColors: { [key: string]: string } = {
+const primaryColor: { [key: string]: string } = {
   Red: "#FF0000",
   Green: "#00FF00",
   Blue: "#0000FF",
@@ -19,6 +19,39 @@ const defaultColors: { [key: string]: string } = {
   Yellow: "#FFFF00",
   Black: "#000000",
   White: "#FFFFFF",
+};
+
+// Gruvbox color scheme
+const gruvboxColors: { [key: string]: string } = {
+  Dark0Hard: "#1d2021",
+  Dark0: "#282828",
+  Dark0Soft: "#32302f",
+  Dark1: "#3c3836",
+  Dark2: "#504945",
+  Dark3: "#665c54",
+  Dark4: "#7c6f64",
+  Gray: "#928374",
+  Light0Hard: "#f9f5d7",
+  Light0: "#fbf1c7",
+  Light0Soft: "#f2e5bc",
+  Light1: "#ebdbb2",
+  Light2: "#d5c4a1",
+  Light3: "#bdae93",
+  Light4: "#a89984",
+  BrightRed: "#fb4934",
+  BrightGreen: "#b8bb26",
+  BrightYellow: "#fabd2f",
+  BrightBlue: "#83a598",
+  BrightPurple: "#d3869b",
+  BrightAqua: "#8ec07c",
+  BrightOrange: "#fe8019",
+  NeutralRed: "#cc241d",
+  NeutralGreen: "#98971a",
+  NeutralYellow: "#d79921",
+  NeutralBlue: "#458588",
+  NeutralPurple: "#b16286",
+  NeutralAqua: "#689d6a",
+  NeutralOrange: "#d65d0e",
 };
 
 const hexColorRegex = /#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/;
@@ -30,7 +63,8 @@ function getInitialColorLibrary(): {
   [folder: string]: { [key: string]: string };
 } {
   return {
-    Default: { ...defaultColors },
+    Primary: { ...primaryColor },
+    Gruvbox: { ...gruvboxColors },
   };
 }
 
