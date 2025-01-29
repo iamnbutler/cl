@@ -1,3 +1,10 @@
+// coming at this with no prior vsc extension knowledge – looking back I wish I
+// had done some reading of the docs before starting, rather than just jumping
+// in with an llm and my bare hands...
+//
+// there is probably some much better ways to tackle some of these things, but
+// hey, that is always the case :D
+
 import * as vscode from "vscode";
 import chroma from "chroma-js";
 
