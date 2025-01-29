@@ -1,6 +1,6 @@
 {
   "name": "color-library",
-  "displayName": "color-library",
+  "displayName": "Color Library",
   "description": "Save, manage and insert colors",
   "version": "0.0.1",
   "title": "Color Library",
@@ -16,7 +16,7 @@
       {
         "command": "color-library.insertAll",
         "title": "Insert All Colors",
-        "icon": "$(list-flat)"
+        "icon": "$(expand-all)"
       },
       {
         "command": "color-library.saveColor",
@@ -26,7 +26,7 @@
       {
         "command": "color-library.insertColor",
         "title": "Color Library: Insert Color",
-        "icon": "$(add)"
+        "icon": "$(chevron-right)"
       },
       {
         "command": "color-library.refreshColors",

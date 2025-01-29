@@ -7,7 +7,10 @@ const explicitlySupportedLanguages = [
   "css",
   "json",
 ] as const;
+
 type SupportedLanguage = (typeof explicitlySupportedLanguages)[number];
+
+// add some temporary default colors to show off how things work
 
 // Add a default set of colors
 const primaryColor: { [key: string]: string } = {
@@ -23,36 +26,41 @@ const primaryColor: { [key: string]: string } = {
 
 // Gruvbox color scheme
 const gruvboxColors: { [key: string]: string } = {
-  Dark0Hard: "#1d2021",
+  Dark0Hard: "#1D2021",
   Dark0: "#282828",
-  Dark0Soft: "#32302f",
-  Dark1: "#3c3836",
+  Dark0Soft: "#32302F",
+  Dark1: "#3C3836",
   Dark2: "#504945",
-  Dark3: "#665c54",
-  Dark4: "#7c6f64",
+  Dark3: "#665C54",
+  Dark4: "#7C6F64",
   Gray: "#928374",
-  Light0Hard: "#f9f5d7",
-  Light0: "#fbf1c7",
-  Light0Soft: "#f2e5bc",
-  Light1: "#ebdbb2",
-  Light2: "#d5c4a1",
-  Light3: "#bdae93",
-  Light4: "#a89984",
-  BrightRed: "#fb4934",
-  BrightGreen: "#b8bb26",
-  BrightYellow: "#fabd2f",
-  BrightBlue: "#83a598",
-  BrightPurple: "#d3869b",
-  BrightAqua: "#8ec07c",
-  BrightOrange: "#fe8019",
-  NeutralRed: "#cc241d",
-  NeutralGreen: "#98971a",
-  NeutralYellow: "#d79921",
+  Light0Hard: "#F9F5D7",
+  Light0: "#FBF1C7",
+  Light0Soft: "#F2E5BC",
+  Light1: "#EBDBB2",
+  Light2: "#D5C4A1",
+  Light3: "#BDAE93",
+  Light4: "#A89984",
+  BrightRed: "#FB4934",
+  BrightGreen: "#B8BB26",
+  BrightYellow: "#FABD2F",
+  BrightBlue: "#83A598",
+  BrightPurple: "#D3869B",
+  BrightAqua: "#8EC07C",
+  BrightOrange: "#FE8019",
+  NeutralRed: "#CC241D",
+  NeutralGreen: "#98971A",
+  NeutralYellow: "#D79921",
   NeutralBlue: "#458588",
-  NeutralPurple: "#b16286",
-  NeutralAqua: "#689d6a",
-  NeutralOrange: "#d65d0e",
+  NeutralPurple: "#B16286",
+  NeutralAqua: "#689D6A",
+  NeutralOrange: "#D65D0E",
 };
+
+// obviously there is a lot more color types we could support here. I've been
+// out of the typescript game for a bit, not sure if there is something as nice
+// as the `palette` crate in rust, but we could probably use that for color
+// parsing instead of a regex-based approach.
 
 const hexColorRegex = /#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/;
 const rgbColorRegex = /rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)/;
@@ -68,6 +76,8 @@ function getInitialColorLibrary(): {
   };
 }
 
+// i didn't have enough time to really research if there is a better way to do this, but it seems like to render something here in the tree view you need to impl a custom svg icon
+
 function createColorIcon(color: string): vscode.Uri {
   const svg = `<svg width="16" height="16" xmlns="http://www.w3.org/2000/svg">
     <rect width="14" height="14" x="1" y="1" fill="${color}" stroke="white" stroke-width="1" stroke-opacity="0.1" rx="2" ry="2" />
@@ -76,6 +86,7 @@ function createColorIcon(color: string): vscode.Uri {
   return vscode.Uri.parse(`data:image/svg+xml;base64,${base64}`);
 }
 
+// missing rust's match here :(
 function tryParseColor(line: string) {
   const hexMatch = line.match(hexColorRegex);
   const rgbMatch = line.match(rgbColorRegex);
@@ -121,6 +132,10 @@ function languageIsSupported(lang: string): lang is SupportedLanguage {
   return explicitlySupportedLanguages.includes(lang as SupportedLanguage);
 }
 
+// ideally with more time i'd use tree-sitter or something here so in languages
+// that need it we could add the correct imports. Like in rust, it would be nice
+// if we could insert `use palette::rgb::Rgb;` at the top (without creating
+// duplicate imports)
 function colorStringForLanguage(color: string, lang?: SupportedLanguage) {
   switch (lang) {
     case "rust":
@@ -136,6 +151,10 @@ function colorStringForLanguage(color: string, lang?: SupportedLanguage) {
   }
 }
 
+// as there would probably be a lot of these, it would be nice to use
+// something similar to handlebars templates to define color strings
+// for various languages/formats, and keep them somewhere external
+// like src/templates
 function allColorsStringForLanguage(
   colors: { [folder: string]: { [key: string]: string } },
   lang: SupportedLanguage | "default",
@@ -292,6 +311,12 @@ class ColorItem extends vscode.TreeItem {
   }
 }
 
+// i'm sure with more time I'd find a lot of what I implemented manually for the
+// panel (add/remove, etc) is probably natively supported by the
+// TreeDataProvider.
+//
+// it seems like a pretty nicely built api for building
+// something quickly that doesn't need too much customization.
 class ColorTreeDataProvider
   implements vscode.TreeDataProvider<ColorItem | FolderItem>
 {
@@ -438,6 +463,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {}
 
+// lots I didn't have time to tackle here, like multiple colors in one line,
+// adding a code action if the cursor was in a color, etc.
+//
+// this could be a lot more frictionless. You shouldn't need to name colors & we should just add to your last used folder.
+
 /// Parse the current line for a color and save it to the library
 async function saveColor(
   context: vscode.ExtensionContext,
@@ -552,6 +582,13 @@ async function clearAllColors(
   }
 }
 
+// i didn't get time to wire this up, and didn't want to push too far outside of
+// the suggested time. Adding import/export from here would be pretty trivial,
+// and make this more useful.
+//
+// we could also add the ability to import from places like Figma or Sketch
+// which would add a lot towards this being something someone would actually
+// want to use.
 async function exportColorsToJson(context: vscode.ExtensionContext) {
   const library = context.globalState.get<{
     [folder: string]: { [key: string]: string };
